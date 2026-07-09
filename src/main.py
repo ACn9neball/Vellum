@@ -5,6 +5,8 @@ from PyQt6.QtWidgets import (
     QApplication,
     QFrame,
     QHBoxLayout,
+    QLabel,
+    QLineEdit,
     QMainWindow,
     QPushButton,
     QSizePolicy,
@@ -38,6 +40,8 @@ class MainWindow(QMainWindow):
         iconSetting = QIcon(str(ASSETS_DIR / "gear.png"))
         btnSetting = QPushButton()
         btnSetting.setIcon(iconSetting)
+        btnSetting.setCheckable(True)
+        btnSetting.clicked.connect(self.settings_toggled)
 
         left_layout.addWidget(btnSetting)
         layout.addWidget(left_container, stretch=1)
@@ -47,9 +51,34 @@ class MainWindow(QMainWindow):
         divider.setFrameShadow(QFrame.Shadow.Sunken)
 
         layout.addWidget(divider)
+
+        self.right_layout = QVBoxLayout(right_container)
         layout.addWidget(right_container, stretch=10)
 
         self.setCentralWidget(container)
+
+    def settings_toggled(self, clicked):
+        if clicked:
+            self.settings()
+
+    def settings(self):
+        path_container = QWidget()
+        path_container.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        path_layout = QHBoxLayout(path_container)
+
+        lblPath = QLabel("Default Manga Path")
+        ledPath = QLineEdit()
+        iconFolder = QIcon(str(ASSETS_DIR / "folder-open.png"))
+        btnPath = QPushButton()
+        btnPath.setIcon(iconFolder)
+
+        path_layout.addWidget(lblPath, stretch=2)
+        path_layout.addWidget(ledPath, stretch=5)
+        path_layout.addWidget(btnPath, stretch=1)
+
+        self.right_layout.addWidget(path_container)
 
 
 if __name__ == "__main__":
