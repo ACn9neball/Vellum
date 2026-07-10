@@ -4,6 +4,7 @@ from pathlib import Path
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QApplication,
+    QComboBox,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -19,7 +20,7 @@ from platformdirs import user_config_dir
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 ASSETS_DIR = BASE_DIR / "assets"
-APP_NAME = "Vellum"
+APP_NAME = "vellum"
 APP_AUTHOR = "Personal"
 
 
@@ -47,13 +48,42 @@ class MainWindow(QMainWindow):
         )
         left_layout = QVBoxLayout(left_container)
 
+        iconOpen = QIcon(str(ASSETS_DIR / "document.png"))
+        btnOpen = QPushButton()
+        btnOpen.setIcon(iconOpen)
+        btnOpen.clicked.connect(self.settings_toggled)
+        btnOpen.setToolTip("Open File")
+
+        iconMultiple = QIcon(str(ASSETS_DIR / "documents.png"))
+        btnMultiple = QPushButton()
+        btnMultiple.setIcon(iconMultiple)
+        btnMultiple.clicked.connect(self.settings_toggled)
+        btnMultiple.setToolTip("Open Files")
+
+        iconFolder = QIcon(str(ASSETS_DIR / "folder-open.png"))
+        btnFolder = QPushButton()
+        btnFolder.setIcon(iconFolder)
+        btnFolder.clicked.connect(self.settings_toggled)
+        btnFolder.setToolTip("Open Folder")
+
         iconSetting = QIcon(str(ASSETS_DIR / "gear.png"))
         btnSetting = QPushButton()
         btnSetting.setIcon(iconSetting)
         btnSetting.setCheckable(True)
         btnSetting.clicked.connect(self.settings_toggled)
+        btnSetting.setToolTip("Global Settings")
 
+        iconExit = QIcon(str(ASSETS_DIR / "door-open-out.png"))
+        btnExit = QPushButton()
+        btnExit.setIcon(iconExit)
+        btnExit.clicked.connect(self.close)
+        btnExit.setToolTip("Exit App")
+
+        left_layout.addWidget(btnOpen)
+        left_layout.addWidget(btnMultiple)
+        left_layout.addWidget(btnFolder)
         left_layout.addWidget(btnSetting)
+        left_layout.addWidget(btnExit)
         layout.addWidget(left_container, stretch=1)
 
         divider = QFrame()
@@ -72,6 +102,21 @@ class MainWindow(QMainWindow):
             self.settings()
 
     def settings(self):
+        theme_container = QWidget()
+        theme_container.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        theme_layout = QHBoxLayout(theme_container)
+
+        lblTheme = QLabel("Theme:")
+        self.cbxPath = QComboBox()
+        self.cbxPath.addItems(["Default", "Light", "Dark"])
+        self.cbxPath.setCurrentText(self.default_settings["theme"])
+        self.cbxPath.currentTextChanged.connect(self.themeSwitcher)
+
+        theme_layout.addWidget(lblTheme, stretch=2)
+        theme_layout.addWidget(self.cbxPath, stretch=8)
+
         path_container = QWidget()
         path_container.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
@@ -90,18 +135,47 @@ class MainWindow(QMainWindow):
         path_layout.addWidget(self.ledPath, stretch=7)
         path_layout.addWidget(btnPath, stretch=1)
 
+        background_container = QWidget()
+        background_container.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        background_layout = QHBoxLayout(background_container)
+
+        lblBackground = QLabel("Default Background Color:")
+        self.cbxBackground = QComboBox()
+        self.cbxBackground.addItems(["Automatic", "Black", "Grey", "White"])
+        self.cbxBackground.setCurrentText(self.default_settings["background_color"])
+        self.cbxPath.currentTextChanged.connect(self.backgroundColorSwitcher)
+
+        background_layout.addWidget(lblBackground, stretch=2)
+        background_layout.addWidget(self.cbxBackground, stretch=8)
+
+        self.right_layout.addWidget(theme_container)
         self.right_layout.addWidget(path_container)
+        self.right_layout.addWidget(background_container)
 
     def pathDefault(self):
         folderPath = QFileDialog.getExistingDirectory(
             None, "Select File", self.default_settings["folder_path"]
         )
-        default_settings = {"theme": "light", "folder_path": folderPath}
-        self.save_settings(default_settings)
+        self.default_settings["folder_path"] = folderPath
+        self.save_settings(self.default_settings)
         self.ledPath.setText(self.default_settings["folder_path"])
 
+    def themeSwitcher(self, theme):
+        self.default_settings["theme"] = theme
+        self.save_settings(self.default_settings)
+
+    def backgroundColorSwitcher(self, color):
+        self.default_settings["background_color"] = color
+        self.save_settings(self.default_settings)
+
     def load_settings(self):
-        default_settings = {"theme": "light", "folder_path": "/home/"}
+        default_settings = {
+            "theme": "Light",
+            "folder_path": "/home/",
+            "background_color": "Automatic",
+        }
         if not self.settings_file.exists():
             self.save_settings(default_settings)
             return default_settings
