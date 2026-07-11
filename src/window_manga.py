@@ -316,6 +316,12 @@ class MainWindow(QMainWindow):
             "theme": "Light",
             "folder_path": "/home/",
             "background_color": "Automatic",
+            "reading_mode": "LTR",
+            "page_layout": "Single Page",
+            "fullscreen": False,
+            "animation": False,
+            "page_layout": "Single Page",
+            "scale_type": "Fit Screen",
         }
         if not self.settings_file.exists():
             self.save_settings(default_settings)

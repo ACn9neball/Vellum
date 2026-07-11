@@ -3,6 +3,7 @@ from pathlib import Path
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFileDialog,
     QFrame,
@@ -115,21 +116,35 @@ class MainWindow(QMainWindow):
                     widget.deleteLater()
 
     def settings(self):
+        lblGroupOne = QLabel("General")
+        dividerOne = QFrame()
+        dividerOne.setFrameShape(QFrame.Shape.HLine)
+        dividerOne.setFrameShadow(QFrame.Shadow.Sunken)
+
+        lblGroupTwo = QLabel("Display and Interface")
+        dividerTwo = QFrame()
+        dividerTwo.setFrameShape(QFrame.Shape.HLine)
+        dividerTwo.setFrameShadow(QFrame.Shadow.Sunken)
+
+        lblGroupThree = QLabel("Layout and Reading Direction")
+        dividerThree = QFrame()
+        dividerThree.setFrameShape(QFrame.Shape.HLine)
+        dividerThree.setFrameShadow(QFrame.Shadow.Sunken)
+
+        # Theme Row
         theme_container = QWidget()
         theme_layout = QHBoxLayout(theme_container)
-
         lblTheme = QLabel("Theme:")
-        self.cbxPath = QComboBox()
-        self.cbxPath.addItems(["Default", "Light", "Dark"])
-        self.cbxPath.setCurrentText(self.default_settings["theme"])
-        self.cbxPath.currentTextChanged.connect(self.themeSwitcher)
-
+        self.cbxTheme = QComboBox()
+        self.cbxTheme.addItems(["Default", "Light", "Dark"])
+        self.cbxTheme.setCurrentText(self.default_settings["theme"])
+        self.cbxTheme.currentTextChanged.connect(self.themeSwitcher)
         theme_layout.addWidget(lblTheme, stretch=2)
-        theme_layout.addWidget(self.cbxPath, stretch=8)
+        theme_layout.addWidget(self.cbxTheme, stretch=8)
 
+        # Default Path Row
         path_container = QWidget()
         path_layout = QHBoxLayout(path_container)
-
         lblPath = QLabel("Default Manga Path:")
         self.ledPath = QLineEdit()
         self.ledPath.setText(self.default_settings["folder_path"])
@@ -137,44 +152,118 @@ class MainWindow(QMainWindow):
         btnPath = QPushButton()
         btnPath.setIcon(iconFolder)
         btnPath.clicked.connect(self.pathDefault)
-
         path_layout.addWidget(lblPath, stretch=2)
         path_layout.addWidget(self.ledPath, stretch=7)
         path_layout.addWidget(btnPath, stretch=1)
 
+        # Background Row
         background_container = QWidget()
         background_layout = QHBoxLayout(background_container)
-
         lblBackground = QLabel("Default Background Color:")
         self.cbxBackground = QComboBox()
         self.cbxBackground.addItems(["Automatic", "Black", "Grey", "White"])
         self.cbxBackground.setCurrentText(self.default_settings["background_color"])
         self.cbxBackground.currentTextChanged.connect(self.backgroundColorSwitcher)
-
         background_layout.addWidget(lblBackground, stretch=2)
         background_layout.addWidget(self.cbxBackground, stretch=8)
 
+        # Reading Mode Row
         reading_container = QWidget()
         reading_layout = QHBoxLayout(reading_container)
-
         lblReading = QLabel("Default Reading Mode:")
         self.cbxReading = QComboBox()
-        self.cbxReading.addItems(["LTR", "RTL", "Vertical", "Vertical-Continuous"])
+        self.cbxReading.addItems(
+            [
+                "LTR",
+                "RTL",
+                "Vertical",
+                "Vertical Continuous",
+                "RTL Double Swapped",
+                "LTR Double Swapped",
+            ]
+        )
         self.cbxReading.setCurrentText(self.default_settings["reading_mode"])
         self.cbxReading.currentTextChanged.connect(self.readerModeSwitcher)
-
         reading_layout.addWidget(lblReading, stretch=2)
         reading_layout.addWidget(self.cbxReading, stretch=8)
+
+        # Fullscreen Row
+        fullscreen_container = QWidget()
+        fullscreen_layout = QHBoxLayout(fullscreen_container)
+        lblFullscreen = QLabel("Fullscreen:")
+        self.chxFullscreen = QCheckBox()
+        self.chxFullscreen.setChecked(self.default_settings["fullscreen"])
+        self.chxFullscreen.stateChanged.connect(self.fullscreenSwitcher)
+        fullscreen_layout.addWidget(lblFullscreen)
+        fullscreen_layout.addStretch()
+        fullscreen_layout.addWidget(self.chxFullscreen)
+
+        # Page Layout Row
+        page_container = QWidget()
+        page_layout = QHBoxLayout(page_container)
+        lblPage = QLabel("Page Layout:")
+        self.cbxPage = QComboBox()
+        self.cbxPage.addItems(["Single Page", "Double Page", "Automatic"])
+        self.cbxPage.setCurrentText(self.default_settings["page_layout"])
+        self.cbxPage.currentTextChanged.connect(self.pageLayoutSwitcher)
+        page_layout.addWidget(lblPage, stretch=2)
+        page_layout.addWidget(self.cbxPage, stretch=8)
+
+        # Animation Row
+        animation_container = QWidget()
+        animation_layout = QHBoxLayout(animation_container)
+        lblAnimation = QLabel("Animation:")
+        self.chxAnimation = QCheckBox()
+        self.chxAnimation.setChecked(self.default_settings["animation"])
+        self.chxAnimation.stateChanged.connect(self.animationSwitcher)
+        animation_layout.addWidget(lblAnimation)
+        animation_layout.addStretch()
+        animation_layout.addWidget(self.chxAnimation)
+
+        # Scale Type Row
+        scale_container = QWidget()
+        scale_layout = QHBoxLayout(scale_container)
+        lblScale = QLabel("Scale Type:")
+        self.cbxScale = QComboBox()
+        self.cbxScale.addItems(
+            ["Fit Screen", "Fit Width", "Fit Height", "Stretch", "Automatic"]
+        )
+        self.cbxScale.setCurrentText(self.default_settings["scale_type"])
+        self.cbxScale.currentTextChanged.connect(self.scaleTypeSwitcher)
+        scale_layout.addWidget(lblScale, stretch=2)
+        scale_layout.addWidget(self.cbxScale, stretch=8)
+
+        # Swapped Page Row
+        swapped_container = QWidget()
+        swapped_layout = QHBoxLayout(swapped_container)
+        lblSwapped = QLabel("Swapped Double Pages:")
+        self.chxSwapped = QCheckBox()
+        self.chxSwapped.setChecked(self.default_settings["swapped_page"])
+        self.chxSwapped.stateChanged.connect(self.swappedPageSwitcher)
+        swapped_layout.addWidget(lblSwapped)
+        swapped_layout.addStretch()
+        swapped_layout.addWidget(self.chxSwapped)
 
         space_container = QWidget()
         space_container.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
 
+        self.right_layout.addWidget(lblGroupOne)
+        self.right_layout.addWidget(dividerOne)
         self.right_layout.addWidget(theme_container)
         self.right_layout.addWidget(path_container)
+        self.right_layout.addWidget(lblGroupTwo)
+        self.right_layout.addWidget(dividerTwo)
+        self.right_layout.addWidget(fullscreen_container)
+        self.right_layout.addWidget(animation_container)
         self.right_layout.addWidget(background_container)
+        self.right_layout.addWidget(lblGroupThree)
+        self.right_layout.addWidget(dividerThree)
         self.right_layout.addWidget(reading_container)
+        self.right_layout.addWidget(page_container)
+        self.right_layout.addWidget(scale_container)
+        self.right_layout.addWidget(swapped_container)
         self.right_layout.addWidget(space_container)
 
     def pathDefault(self):
@@ -197,12 +286,40 @@ class MainWindow(QMainWindow):
         self.default_settings["reading_mode"] = type
         self.save_settings(self.default_settings)
 
+    def fullscreenSwitcher(self, f):
+        isfullscreen = True if f == 2 else False
+        self.default_settings["fullscreen"] = isfullscreen
+        self.save_settings(self.default_settings)
+
+    def pageLayoutSwitcher(self, type):
+        self.default_settings["page_layout"] = type
+        self.save_settings(self.default_settings)
+
+    def animationSwitcher(self, a):
+        animation = True if a == 2 else False
+        self.default_settings["animation"] = animation
+        self.save_settings(self.default_settings)
+
+    def scaleTypeSwitcher(self, type):
+        self.default_settings["scale_type"] = type
+        self.save_settings(self.default_settings)
+
+    def swappedPageSwitcher(self, s):
+        swapped = True if s == 2 else False
+        self.default_settings["swapped_page"] = swapped
+        self.save_settings(self.default_settings)
+
     def load_settings(self):
         default_settings = {
             "theme": "Light",
             "folder_path": "/home/",
             "background_color": "Automatic",
             "reading_mode": "LTR",
+            "page_layout": "Single Page",
+            "fullscreen": False,
+            "animation": False,
+            "scale_type": "Fit Screen",
+            "swapped_page": False,
         }
         if not self.settings_file.exists():
             self.save_settings(default_settings)
