@@ -9,13 +9,13 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
     QMainWindow,
     QPushButton,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
-from platformdirs import user_config_dir
 import json_parsing
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,7 +23,7 @@ ASSETS_DIR = BASE_DIR / "assets"
 
 
 class MainWindow(QMainWindow):
-    data_submitted = pyqtSignal(str)
+    data_submitted = pyqtSignal(list)
 
     def __init__(self):
         super().__init__()
@@ -31,6 +31,7 @@ class MainWindow(QMainWindow):
         container = QWidget()
 
         self.default_settings = json_parsing.load_settings()
+        self.default_recents = json_parsing.load_recents()
 
         layout = QHBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -55,13 +56,20 @@ class MainWindow(QMainWindow):
         iconMultiple = QIcon(str(ASSETS_DIR / "documents.png"))
         btnMultiple = QPushButton()
         btnMultiple.setIcon(iconMultiple)
-        btnMultiple.clicked.connect(self.settings_toggled)
+        btnMultiple.clicked.connect(self.openFiles)
         btnMultiple.setToolTip("Open Files")
+
+        iconRecent = QIcon(str(ASSETS_DIR / "documents-stack.png"))
+        self.btnRecent = QPushButton()
+        self.btnRecent.setIcon(iconRecent)
+        self.btnRecent.setCheckable(True)
+        self.btnRecent.clicked.connect(self.recents_toggled)
+        self.btnRecent.setToolTip("Open Recent Files")
 
         iconFolder = QIcon(str(ASSETS_DIR / "folder-open.png"))
         btnFolder = QPushButton()
         btnFolder.setIcon(iconFolder)
-        btnFolder.clicked.connect(self.settings_toggled)
+        btnFolder.clicked.connect(self.openFolder)
         btnFolder.setToolTip("Open Folder")
 
         space_container = QWidget()
@@ -70,11 +78,11 @@ class MainWindow(QMainWindow):
         )
 
         iconSetting = QIcon(str(ASSETS_DIR / "gear.png"))
-        btnSetting = QPushButton()
-        btnSetting.setIcon(iconSetting)
-        btnSetting.setCheckable(True)
-        btnSetting.clicked.connect(self.settings_toggled)
-        btnSetting.setToolTip("Global Settings")
+        self.btnSetting = QPushButton()
+        self.btnSetting.setIcon(iconSetting)
+        self.btnSetting.setCheckable(True)
+        self.btnSetting.clicked.connect(self.settings_toggled)
+        self.btnSetting.setToolTip("Global Settings")
 
         iconExit = QIcon(str(ASSETS_DIR / "door-open-out.png"))
         btnExit = QPushButton()
@@ -85,8 +93,9 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(btnOpen)
         left_layout.addWidget(btnMultiple)
         left_layout.addWidget(btnFolder)
+        left_layout.addWidget(self.btnRecent)
         left_layout.addWidget(space_container)
-        left_layout.addWidget(btnSetting)
+        left_layout.addWidget(self.btnSetting)
         left_layout.addWidget(btnExit)
         layout.addWidget(left_container, stretch=1)
 
@@ -103,13 +112,26 @@ class MainWindow(QMainWindow):
 
     def settings_toggled(self, clicked):
         if clicked:
+            self.clearRight()
             self.settings()
+            self.btnRecent.setChecked(False)
         else:
-            while self.right_layout.count():
-                item = self.right_layout.takeAt(0)
-                widget = item.widget()
-                if widget is not None:
-                    widget.deleteLater()
+            self.clearRight()
+
+    def recents_toggled(self, clicked):
+        if clicked:
+            self.clearRight()
+            self.recents()
+            self.btnSetting.setChecked(False)
+        else:
+            self.clearRight()
+
+    def clearRight(self):
+        while self.right_layout.count():
+            item = self.right_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
 
     def settings(self):
         lblGroupOne = QLabel("General")
@@ -174,8 +196,6 @@ class MainWindow(QMainWindow):
                 "RTL",
                 "Vertical",
                 "Vertical Continuous",
-                "RTL Double Swapped",
-                "LTR Double Swapped",
             ]
         )
         self.cbxReading.setCurrentText(self.default_settings["reading_mode"])
@@ -262,6 +282,25 @@ class MainWindow(QMainWindow):
         self.right_layout.addWidget(swapped_container)
         self.right_layout.addWidget(space_container)
 
+    def recents(self):
+        lblRecent = QLabel("Recent Files")
+        dividerOne = QFrame()
+        dividerOne.setFrameShape(QFrame.Shape.HLine)
+        dividerOne.setFrameShadow(QFrame.Shadow.Sunken)
+
+        lwdRecents = QListWidget()
+        recents = self.default_recents["recent_files"]
+        recents.reverse()
+        lwdRecents.addItems(recents)
+        lwdRecents.itemDoubleClicked.connect(self.recentItemClicked)
+
+        btnClear = QPushButton("Clear")
+
+        self.right_layout.addWidget(lblRecent)
+        self.right_layout.addWidget(dividerOne)
+        self.right_layout.addWidget(lwdRecents)
+        self.right_layout.addWidget(btnClear)
+
     def pathDefault(self):
         folderPath = QFileDialog.getExistingDirectory(
             None, "Select File", self.default_settings["folder_path"]
@@ -305,6 +344,13 @@ class MainWindow(QMainWindow):
         self.default_settings["swapped_page"] = swapped
         self.save_settings(self.default_settings)
 
+    def recentItemClicked(self, item):
+        file_path = item.text()
+        file_paths = [file_path]
+        if file_path != "":
+            self.save_recents(file_path)
+            self.data_submitted.emit(file_paths)
+
     def openFile(self):
         file_path, _ = QFileDialog.getOpenFileName(
             None,
@@ -312,8 +358,63 @@ class MainWindow(QMainWindow):
             self.default_settings["folder_path"],
             "Comic Book Zip (*.cbz)",
         )
-        self.data_submitted.emit(file_path)
+        file_paths = [file_path]
+        if file_path != "":
+            self.save_recents(file_path)
+            self.data_submitted.emit(file_paths)
+
+    def openFiles(self):
+        file_paths, _ = QFileDialog.getOpenFileNames(
+            None,
+            "Select File",
+            self.default_settings["folder_path"],
+            "Comic Book Zip (*.cbz)",
+        )
+
+        if file_paths != []:
+            self.save_recents(file_paths[0])
+            self.data_submitted.emit(file_paths)
+
+    def openFolder(self):
+        folder_path = QFileDialog.getExistingDirectory(
+            None,
+            "Select File",
+            self.default_settings["folder_path"],
+        )
+
+        if not folder_path:
+            return
+
+        folder_path = Path(folder_path)
+        file_paths = [str(file) for file in folder_path.glob("*.cbz")]
+        if file_paths != []:
+            self.save_recents(file_paths[0])
+            self.data_submitted.emit(file_paths)
 
     def save_settings(self, data):
         json_parsing.save_settings(data)
         self.default_settings = json_parsing.load_settings()
+
+    def save_recents(self, path):
+        data = self.default_recents
+        recents = self.default_recents["recent_files"]
+        found = False
+        index = 0
+        for recent in recents:
+            if recent == path:
+                found = True
+                break
+            index += 1
+
+        if found:
+            recents.pop(index)
+            recents.append(path)
+        else:
+            if len(recents) < 20:
+                recents.append(path)
+            else:
+                recents.pop(0)
+                recents.append(path)
+
+        json_parsing.save_recents(data)
+        self.default_recents = json_parsing.load_recents()

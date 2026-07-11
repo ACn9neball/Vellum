@@ -33,7 +33,8 @@ class MainWindow(QMainWindow):
         self.page_number = 1
         self.total_pages = 0
         self.previousStep = 0
-        self.file_path = None
+        self.file_paths = None
+        self.file_count = 0
         self.double = True
 
         self.left_pixmap = None
@@ -271,7 +272,7 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        if self.file_path:
+        if self.file_paths[self.file_count]:
             self.imageScale(self.current_scale_mode)
 
     def detect_page_type(self, width, height):
@@ -298,13 +299,13 @@ class MainWindow(QMainWindow):
         step = 2 if self.double else 1
         if self.page_number + step <= self.total_pages:
             self.page_number += step
-            self.display(self.file_path)
+            self.display(self.file_paths[self.file_count])
             self.previousStep = step
 
     def previousPage(self):
         if self.page_number - self.previousStep >= 1:
             self.page_number -= self.previousStep
-            self.display(self.file_path)
+            self.display(self.file_paths[self.file_count])
 
     def openFile(self):
         self.page_number = 1
@@ -318,6 +319,7 @@ class MainWindow(QMainWindow):
         self.display(self.file_path)
 
     def receive_data(self, data):
-        self.file_path = data
+        self.file_paths = data
         self.page_number = 1
-        self.display(data)
+        self.file_count = 0
+        self.display(data[self.file_count])

@@ -7,6 +7,7 @@ APP_AUTHOR = "Personal"
 
 config_dir = Path(user_config_dir(APP_NAME, APP_AUTHOR))
 settings_file = config_dir / "settings.json"
+recents_file = config_dir / "recents.json"
 
 
 def load_settings():
@@ -33,4 +34,21 @@ def save_settings(data):
     config_dir.mkdir(parents=True, exist_ok=True)
 
     with open(settings_file, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)
+
+
+def load_recents():
+    default_recents = {"recent_files": []}
+    if not recents_file.exists():
+        save_recents(default_recents)
+        return default_recents
+
+    with open(recents_file, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_recents(data):
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    with open(recents_file, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
