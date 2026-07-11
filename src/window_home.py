@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QIcon
@@ -17,11 +16,10 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from platformdirs import user_config_dir
+import json_parsing
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 ASSETS_DIR = BASE_DIR / "assets"
-APP_NAME = "vellum"
-APP_AUTHOR = "Personal"
 
 
 class MainWindow(QMainWindow):
@@ -32,9 +30,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Vellum")
         container = QWidget()
 
-        self.config_dir = Path(user_config_dir(APP_NAME, APP_AUTHOR))
-        self.settings_file = self.config_dir / "settings.json"
-        self.default_settings = self.load_settings()
+        self.default_settings = json_parsing.load_settings()
 
         layout = QHBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -309,33 +305,6 @@ class MainWindow(QMainWindow):
         self.default_settings["swapped_page"] = swapped
         self.save_settings(self.default_settings)
 
-    def load_settings(self):
-        default_settings = {
-            "theme": "Light",
-            "folder_path": "/home/",
-            "background_color": "Automatic",
-            "reading_mode": "LTR",
-            "page_layout": "Single Page",
-            "fullscreen": False,
-            "animation": False,
-            "scale_type": "Fit Screen",
-            "swapped_page": False,
-        }
-        if not self.settings_file.exists():
-            self.save_settings(default_settings)
-            return default_settings
-
-        with open(self.settings_file, "r", encoding="utf-8") as f:
-            return json.load(f)
-
-    def save_settings(self, data):
-        self.config_dir.mkdir(parents=True, exist_ok=True)
-
-        with open(self.settings_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4)
-
-        self.default_settings = self.load_settings()
-
     def openFile(self):
         file_path, _ = QFileDialog.getOpenFileName(
             None,
@@ -344,3 +313,7 @@ class MainWindow(QMainWindow):
             "Comic Book Zip (*.cbz)",
         )
         self.data_submitted.emit(file_path)
+
+    def save_settings(self, data):
+        json_parsing.save_settings(data)
+        self.default_settings = json_parsing.load_settings()
