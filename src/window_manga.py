@@ -301,11 +301,31 @@ class MainWindow(QMainWindow):
             self.page_number += step
             self.display(self.file_paths[self.file_count])
             self.previousStep = step
+        elif self.page_number + step > self.total_pages:
+            data = self.file_paths
+            if self.file_count < len(data) - 1:
+                self.file_count += 1
+                self.page_number = 1
+                self.previousStep = 0
+                self.default_recents = json_parsing.save_recent(
+                    self.default_recents, data[self.file_count]
+                )
+                self.display(data[self.file_count])
 
     def previousPage(self):
         if self.page_number - self.previousStep >= 1:
             self.page_number -= self.previousStep
             self.display(self.file_paths[self.file_count])
+        elif self.page_number - self.previousStep < 1:
+            data = self.file_paths
+            if self.file_count > 0:
+                self.file_count -= 1
+                self.page_number = 1
+                self.previousStep = 0
+                self.default_recents = json_parsing.save_recent(
+                    self.default_recents, data[self.file_count]
+                )
+                self.display(data[self.file_count])
 
     def openFile(self):
         self.page_number = 1
@@ -316,7 +336,46 @@ class MainWindow(QMainWindow):
             self.default_settings["folder_path"],
             "Comic Book Zip (*.cbz)",
         )
-        self.display(self.file_path)
+        file_paths = [self.file_path]
+        if self.file_path != "":
+            self.default_recents = json_parsing.save_recent(
+                self.default_recents, file_paths[0]
+            )
+            self.display(self.file_path)
+
+    def openFiles(self):
+        file_paths, _ = QFileDialog.getOpenFileNames(
+            None,
+            "Select File",
+            self.default_settings["folder_path"],
+            "Comic Book Zip (*.cbz)",
+        )
+
+        if file_paths != []:
+            self.default_recents = json_parsing.save_recent(
+                self.default_recents, file_paths[0]
+            )
+            self.file_path = file_paths[0]
+            self.display(self.file_path)
+
+    def openFolder(self):
+        folder_path = QFileDialog.getExistingDirectory(
+            None,
+            "Select File",
+            self.default_settings["folder_path"],
+        )
+
+        if not folder_path:
+            return
+
+        folder_path = Path(folder_path)
+        file_paths = [str(file) for file in folder_path.glob("*.cbz")]
+        if file_paths != []:
+            self.default_recents = json_parsing.save_recent(
+                self.default_recents, file_paths[0]
+            )
+            self.file_path = file_paths[0]
+            self.display(self.file_path)
 
     def receive_data(self, data):
         self.file_paths = data

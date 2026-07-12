@@ -348,7 +348,9 @@ class MainWindow(QMainWindow):
         file_path = item.text()
         file_paths = [file_path]
         if file_path != "":
-            self.save_recents(file_path)
+            self.default_recents = json_parsing.save_recent(
+                self.default_recents, file_paths[0]
+            )
             self.data_submitted.emit(file_paths)
 
     def openFile(self):
@@ -360,7 +362,9 @@ class MainWindow(QMainWindow):
         )
         file_paths = [file_path]
         if file_path != "":
-            self.save_recents(file_path)
+            self.default_recents = json_parsing.save_recent(
+                self.default_recents, file_paths[0]
+            )
             self.data_submitted.emit(file_paths)
 
     def openFiles(self):
@@ -372,7 +376,9 @@ class MainWindow(QMainWindow):
         )
 
         if file_paths != []:
-            self.save_recents(file_paths[0])
+            self.default_recents = json_parsing.save_recent(
+                self.default_recents, file_paths[0]
+            )
             self.data_submitted.emit(file_paths)
 
     def openFolder(self):
@@ -388,33 +394,11 @@ class MainWindow(QMainWindow):
         folder_path = Path(folder_path)
         file_paths = [str(file) for file in folder_path.glob("*.cbz")]
         if file_paths != []:
-            self.save_recents(file_paths[0])
+            self.default_recents = json_parsing.save_recent(
+                self.default_recents, file_paths[0]
+            )
             self.data_submitted.emit(file_paths)
 
     def save_settings(self, data):
         json_parsing.save_settings(data)
         self.default_settings = json_parsing.load_settings()
-
-    def save_recents(self, path):
-        data = self.default_recents
-        recents = self.default_recents["recent_files"]
-        found = False
-        index = 0
-        for recent in recents:
-            if recent == path:
-                found = True
-                break
-            index += 1
-
-        if found:
-            recents.pop(index)
-            recents.append(path)
-        else:
-            if len(recents) < 20:
-                recents.append(path)
-            else:
-                recents.pop(0)
-                recents.append(path)
-
-        json_parsing.save_recents(data)
-        self.default_recents = json_parsing.load_recents()

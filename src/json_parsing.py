@@ -38,7 +38,7 @@ def save_settings(data):
 
 
 def load_recents():
-    default_recents = {"recent_files": []}
+    default_recents = {"recent_files": [], "recent_file_pages": []}
     if not recents_file.exists():
         save_recents(default_recents)
         return default_recents
@@ -52,3 +52,27 @@ def save_recents(data):
 
     with open(recents_file, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
+
+
+def save_recent(data, path):
+    recents = data["recent_files"]
+    found = False
+    index = 0
+    for recent in recents:
+        if recent == path:
+            found = True
+            break
+        index += 1
+
+    if found:
+        recents.pop(index)
+        recents.append(path)
+    else:
+        if len(recents) < 30:
+            recents.append(path)
+        else:
+            recents.pop(0)
+            recents.append(path)
+
+    save_recents(data)
+    return load_recents()
