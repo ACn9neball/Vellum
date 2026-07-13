@@ -1,6 +1,6 @@
 import json_parsing, zipfile
 from pathlib import Path
-from PyQt6.QtGui import QAction, QIcon, QKeyEvent, QPixmap
+from PyQt6.QtGui import QAction, QActionGroup, QIcon, QKeyEvent, QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QFileDialog,
@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QStackedWidget,
 )
+from widgets import ClickableLabel
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 ASSETS_DIR = BASE_DIR / "assets"
@@ -26,17 +27,24 @@ class MainWindow(QMainWindow):
         self.default_settings = json_parsing.load_settings()
         self.default_recents = json_parsing.load_recents()
 
+        self.localFullscreen = self.default_settings["fullscreen"]
         backgroundColor = self.default_settings["background_color"]
         theme = self.default_settings["theme"]
         match backgroundColor:
             case "Automatic":
-                pass
+                match theme:
+                    case "Default":
+                        self.setStyleSheet("QMainWindow { background-color: grey; }")
+                    case "Light":
+                        self.setStyleSheet("QMainWindow { background-color: white; }")
+                    case "Dark":
+                        self.setStyleSheet("QMainWindow { background-color: black; }")
             case "Black":
-                pass
+                self.setStyleSheet("QMainWindow { background-color: black; }")
             case "Grey":
-                pass
+                self.setStyleSheet("QMainWindow { background-color: grey; }")
             case "White":
-                pass
+                self.setStyleSheet("QMainWindow { background-color: white; }")
 
         self.current_scale_mode = 0
         self.page_number = 1
@@ -63,15 +71,21 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        self.left_image = QLabel()
+        self.left_image = ClickableLabel()
         self.left_image.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         )
+        self.left_image.doubleClick.connect(
+            lambda: self.fullscreen(not self.localFullscreen)
+        )
         layout.addWidget(self.left_image)
 
-        self.right_image = QLabel()
+        self.right_image = ClickableLabel()
         self.right_image.setAlignment(
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
+        self.right_image.doubleClick.connect(
+            lambda: self.fullscreen(not self.localFullscreen)
         )
         layout.addWidget(self.right_image)
 
@@ -92,13 +106,13 @@ class MainWindow(QMainWindow):
         self.view_stack.addWidget(container)
 
     def _init_menu_bar(self):
-        menu_bar = QMenuBar(self)
-        self.setMenuBar(menu_bar)
+        self.menu_bar = QMenuBar(self)
+        self.setMenuBar(self.menu_bar)
 
-        self._build_file_menu(menu_bar)
-        self._build_reader_menu(menu_bar)
-        self._build_playback_menu(menu_bar)
-        self._build_help_menu(menu_bar)
+        self._build_file_menu(self.menu_bar)
+        self._build_reader_menu(self.menu_bar)
+        self._build_playback_menu(self.menu_bar)
+        self._build_help_menu(self.menu_bar)
 
     def _build_file_menu(self, menu_bar: QMenuBar):
         file_menu = menu_bar.addMenu("&File")
@@ -146,16 +160,32 @@ class MainWindow(QMainWindow):
 
     def _build_reader_menu(self, menu_bar: QMenuBar):
         reader_menu = menu_bar.addMenu("&Reader")
-        fullscreen_action = QAction(
-            QIcon(str(ASSETS_DIR / "application-resize-full.png")), "&Fullscreen", self
+        self.fullscreen_action = QAction("&Fullscreen", self)
+        self.fullscreen_action.setStatusTip("Fullscreen Mode")
+        self.fullscreen_action.setCheckable(True)
+        self.fullscreen_action.setChecked(self.localFullscreen)
+        self.fullscreen_action.triggered.connect(
+            lambda _, c=self.localFullscreen: self.fullscreen(c)
         )
-        fullscreen_action.setStatusTip("Fullscreen Mode")
-        reader_menu.addAction(fullscreen_action)
-        readmode_action = QAction(
-            QIcon(str(ASSETS_DIR / "e-book-reader.png")), "Read Mode", self
-        )
-        readmode_action.setStatusTip("Change Reading Mode")
-        reader_menu.addAction(readmode_action)
+        reader_menu.addAction(self.fullscreen_action)
+
+        readmode_submenu = reader_menu.addMenu("Reading Mode")
+        mode = self.default_settings["reading_mode"]
+        modes = ["LTR", "RTL", "Vertical", "Vertical Continuous"]
+        mode_group = QActionGroup(self)
+
+        for m in modes:
+            action = QAction(m, self)
+            action.setCheckable(True)
+            mode_group.addAction(action)
+            # action.triggered.connect(lambda _, path=m: self.open(path))
+            readmode_submenu.addAction(action)
+
+        if mode_group.actions():
+            for i, m in enumerate(modes):
+                if m == mode:
+                    mode_group.actions()[i].setChecked(True)
+
         backcolor_action = QAction(
             QIcon(str(ASSETS_DIR / "border-color.png")), "Background Color", self
         )
@@ -209,6 +239,8 @@ class MainWindow(QMainWindow):
         help_menu.addAction(about_action)
 
     def display(self, path):
+        fullScreen = self.default_settings["fullscreen"]
+        self.fullscreen(fullScreen)
         if not path or not Path(path).exists():
             return
 
@@ -350,6 +382,10 @@ class MainWindow(QMainWindow):
                 self.previousPage()
             case Qt.Key.Key_P:
                 self.previousPage()
+            case Qt.Key.Key_Escape:
+                if self.localFullscreen:
+                    self.localFullscreen = False
+                    self.fullscreen(False)
             case _:
                 super().keyPressEvent(event)
 
@@ -451,6 +487,18 @@ class MainWindow(QMainWindow):
             )
             self.file_path = file_paths[0]
             self.display(self.file_path)
+
+    def fullscreen(self, f: bool):
+        if f:
+            self.menu_bar.hide()
+            self.showFullScreen()
+            self.localFullscreen = True
+        else:
+            self.menu_bar.show()
+            self.showNormal()
+            self.localFullscreen = False
+
+        self.fullscreen_action.setChecked(self.localFullscreen)
 
     def receive_data(self, data):
         self.file_paths = data
