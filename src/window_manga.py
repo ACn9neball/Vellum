@@ -1,7 +1,7 @@
-import json_parsing
-import zipfile
+import json_parsing, zipfile
 from pathlib import Path
 from PyQt6.QtGui import QAction, QIcon, QKeyEvent, QPixmap
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -11,7 +11,6 @@ from PyQt6.QtWidgets import (
     QWidget,
     QStackedWidget,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 ASSETS_DIR = BASE_DIR / "assets"
@@ -22,12 +21,22 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Manga Reader")
-        self.resize(1000, 750)
 
         self.statusBar()
-
         self.default_settings = json_parsing.load_settings()
+        self.default_recents = json_parsing.load_recents()
+
+        backgroundColor = self.default_settings["background_color"]
+        theme = self.default_settings["theme"]
+        match backgroundColor:
+            case "Automatic":
+                pass
+            case "Black":
+                pass
+            case "Grey":
+                pass
+            case "White":
+                pass
 
         self.current_scale_mode = 0
         self.page_number = 1
@@ -99,22 +108,33 @@ class MainWindow(QMainWindow):
         open_action.triggered.connect(self.openFile)
         file_menu.addAction(open_action)
 
-        recent_action = QAction(
-            QIcon(str(ASSETS_DIR / "documents.png")), "Open Recent", self
+        multiple_action = QAction(
+            QIcon(str(ASSETS_DIR / "documents.png")), "&Open Multiple", self
         )
-        recent_action.setStatusTip("Open Recent Manga")
-        file_menu.addAction(recent_action)
+        multiple_action.setStatusTip("Open Multiple Files")
+        multiple_action.triggered.connect(self.openFiles)
+        file_menu.addAction(multiple_action)
 
         collection_action = QAction(
             QIcon(str(ASSETS_DIR / "folder-open.png")), "Open Collection", self
         )
         collection_action.setStatusTip("Open Manga Collection")
+        collection_action.triggered.connect(self.openFolder)
         file_menu.addAction(collection_action)
+
+        file_submenu = file_menu.addMenu("Open Recent Manga")
+        recents = self.default_recents["recent_files"]
+
+        for recent in recents:
+            action = QAction(recent, self)
+            action.triggered.connect(lambda _, path=recent: self.open(path))
+            file_submenu.addAction(action)
 
         file_menu.addSeparator()
 
         close_action = QAction(QIcon(str(ASSETS_DIR / "cross.png")), "&Close", self)
         close_action.setStatusTip("Close File")
+        close_action.triggered.connect(self.go_back_requested.emit)
         file_menu.addAction(close_action)
 
         quit_action = QAction(
@@ -156,15 +176,28 @@ class MainWindow(QMainWindow):
         )
         reader_menu.addAction(playlist_action)
         previous_action = QAction(
-            QIcon(str(ASSETS_DIR / "document-page-previous.png")), "&Previous", self
+            QIcon(str(ASSETS_DIR / "book-open-previous.png")), "&Previous", self
         )
         previous_action.triggered.connect(self.previousPage)
         reader_menu.addAction(previous_action)
         next_action = QAction(
-            QIcon(str(ASSETS_DIR / "document-page-next.png")), "&Next", self
+            QIcon(str(ASSETS_DIR / "book-open-next.png")), "&Next", self
         )
         next_action.triggered.connect(self.nextPage)
         reader_menu.addAction(next_action)
+
+        pChapter_action = QAction(
+            QIcon(str(ASSETS_DIR / "document-page-previous.png")),
+            "&Previous Chapter",
+            self,
+        )
+        pChapter_action.triggered.connect(self.previousChapter)
+        reader_menu.addAction(pChapter_action)
+        nChapter_action = QAction(
+            QIcon(str(ASSETS_DIR / "document-page-next.png")), "&Next Chapter", self
+        )
+        nChapter_action.triggered.connect(self.nextChapter)
+        reader_menu.addAction(nChapter_action)
 
     def _build_help_menu(self, menu_bar: QMenuBar):
         help_menu = menu_bar.addMenu("&Help")
@@ -201,18 +234,34 @@ class MainWindow(QMainWindow):
                 self.detect_page_type(pix_map.width(), pix_map.height())
 
             if self.double:
-                self.view_stack.setCurrentIndex(0)
+                match self.default_settings["reading_mode"]:
+                    case "LTR" | "RTL":
+                        if self.default_settings["swapped_page"]:
+                            self.view_stack.setCurrentIndex(0)
 
-                with cbz.open(pages[self.page_number - 1]) as f:
-                    self.left_pixmap = QPixmap()
-                    self.left_pixmap.loadFromData(f.read())
+                            with cbz.open(pages[self.page_number - 1]) as f:
+                                self.right_pixmap = QPixmap()
+                                self.right_pixmap.loadFromData(f.read())
 
-                if self.page_number < self.total_pages:
-                    with cbz.open(pages[self.page_number]) as f:
-                        self.right_pixmap = QPixmap()
-                        self.right_pixmap.loadFromData(f.read())
-                else:
-                    self.right_pixmap = None
+                            if self.page_number < self.total_pages:
+                                with cbz.open(pages[self.page_number]) as f:
+                                    self.left_pixmap = QPixmap()
+                                    self.left_pixmap.loadFromData(f.read())
+                            else:
+                                self.left_pixmap = None
+                        else:
+                            self.view_stack.setCurrentIndex(0)
+
+                            with cbz.open(pages[self.page_number - 1]) as f:
+                                self.left_pixmap = QPixmap()
+                                self.left_pixmap.loadFromData(f.read())
+
+                            if self.page_number < self.total_pages:
+                                with cbz.open(pages[self.page_number]) as f:
+                                    self.right_pixmap = QPixmap()
+                                    self.right_pixmap.loadFromData(f.read())
+                            else:
+                                self.right_pixmap = None
             else:
                 self.view_stack.setCurrentIndex(1)
 
@@ -264,8 +313,17 @@ class MainWindow(QMainWindow):
                 )
                 label.setPixmap(scaled)
             case 1:
-                label.setScaledContents(True)
-                label.setPixmap(pixmap)
+                label.setScaledContents(False)
+                target_size = self.centralWidget().size()
+                if self.double:
+                    target_size.setWidth(int(target_size.width() / 2))
+
+                scaled = pixmap.scaled(
+                    target_size,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+                label.setPixmap(scaled)
             case 2 | 3:
                 label.setScaledContents(False)
                 label.setPixmap(pixmap)
@@ -302,30 +360,47 @@ class MainWindow(QMainWindow):
             self.display(self.file_paths[self.file_count])
             self.previousStep = step
         elif self.page_number + step > self.total_pages:
-            data = self.file_paths
-            if self.file_count < len(data) - 1:
-                self.file_count += 1
-                self.page_number = 1
-                self.previousStep = 0
-                self.default_recents = json_parsing.save_recent(
-                    self.default_recents, data[self.file_count]
-                )
-                self.display(data[self.file_count])
+            self.nextChapter()
 
     def previousPage(self):
         if self.page_number - self.previousStep >= 1:
             self.page_number -= self.previousStep
             self.display(self.file_paths[self.file_count])
         elif self.page_number - self.previousStep < 1:
-            data = self.file_paths
-            if self.file_count > 0:
-                self.file_count -= 1
-                self.page_number = 1
-                self.previousStep = 0
-                self.default_recents = json_parsing.save_recent(
-                    self.default_recents, data[self.file_count]
-                )
-                self.display(data[self.file_count])
+            self.previousChapter()
+
+    def nextChapter(self):
+        data = self.file_paths
+        if self.file_count < len(data) - 1:
+            self.file_count += 1
+            self.page_number = 1
+            self.previousStep = 0
+            self.file_path = self.file_paths[self.file_path]
+            self.default_recents = json_parsing.save_recent(
+                self.default_recents, data[self.file_count]
+            )
+            self.display(data[self.file_count])
+
+    def previousChapter(self):
+        data = self.file_paths
+        if self.file_count > 0:
+            self.file_count -= 1
+            self.page_number = 1
+            self.previousStep = 0
+            self.file_path = self.file_paths[self.file_path]
+            self.default_recents = json_parsing.save_recent(
+                self.default_recents, data[self.file_count]
+            )
+            self.display(data[self.file_count])
+
+    def open(self, file_path):
+        self.file_path = file_path
+        self.file_paths = [self.file_path]
+        if self.file_path != "":
+            self.default_recents = json_parsing.save_recent(
+                self.default_recents, self.file_paths[0]
+            )
+            self.display(self.file_path)
 
     def openFile(self):
         self.page_number = 1

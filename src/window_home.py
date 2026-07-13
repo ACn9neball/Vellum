@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QSizePolicy,
     QVBoxLayout,
@@ -295,6 +296,7 @@ class MainWindow(QMainWindow):
         lwdRecents.itemDoubleClicked.connect(self.recentItemClicked)
 
         btnClear = QPushButton("Clear")
+        btnClear.clicked.connect(self.clearToggled)
 
         self.right_layout.addWidget(lblRecent)
         self.right_layout.addWidget(dividerOne)
@@ -352,6 +354,22 @@ class MainWindow(QMainWindow):
                 self.default_recents, file_paths[0]
             )
             self.data_submitted.emit(file_paths)
+
+    def clearToggled(self):
+        mbxConfirm = QMessageBox()
+        mbxConfirm.setWindowTitle("Clear All")
+        mbxConfirm.setText("Clear All Recent Entries")
+        mbxConfirm.setIcon(QMessageBox.Icon.Warning)
+        mbxConfirm.setStandardButtons(
+            QMessageBox.StandardButton.No | QMessageBox.StandardButton.Yes
+        )
+        mbxConfirm.setDefaultButton(QMessageBox.StandardButton.No)
+
+        response = mbxConfirm.exec()
+        if response == QMessageBox.StandardButton.Yes:
+            pass
+        elif response == QMessageBox.StandardButton.No:
+            pass
 
     def openFile(self):
         file_path, _ = QFileDialog.getOpenFileName(
