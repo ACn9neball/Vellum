@@ -4,10 +4,13 @@ from PyQt6.QtGui import QAction, QActionGroup, QIcon, QKeyEvent, QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QFileDialog,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
     QMenuBar,
+    QScrollArea,
+    QVBoxLayout,
     QWidget,
     QStackedWidget,
 )
@@ -29,28 +32,13 @@ class MainWindow(QMainWindow):
 
         self.localFullscreen = self.default_settings["fullscreen"]
         backgroundColor = self.default_settings["background_color"]
-        theme = self.default_settings["theme"]
-        match backgroundColor:
-            case "Automatic":
-                match theme:
-                    case "Default":
-                        self.setStyleSheet("QMainWindow { background-color: grey; }")
-                    case "Light":
-                        self.setStyleSheet("QMainWindow { background-color: white; }")
-                    case "Dark":
-                        self.setStyleSheet("QMainWindow { background-color: black; }")
-            case "Black":
-                self.setStyleSheet("QMainWindow { background-color: black; }")
-            case "Grey":
-                self.setStyleSheet("QMainWindow { background-color: grey; }")
-            case "White":
-                self.setStyleSheet("QMainWindow { background-color: white; }")
+        self.background(backgroundColor)
 
         self.current_scale_mode = 0
         self.page_number = 1
         self.total_pages = 0
         self.previousStep = 0
-        self.file_paths = None
+        self.file_paths = []
         self.file_count = 0
         self.double = True
 
@@ -177,8 +165,8 @@ class MainWindow(QMainWindow):
         for m in modes:
             action = QAction(m, self)
             action.setCheckable(True)
-            mode_group.addAction(action)
             # action.triggered.connect(lambda _, path=m: self.open(path))
+            mode_group.addAction(action)
             readmode_submenu.addAction(action)
 
         if mode_group.actions():
@@ -186,35 +174,77 @@ class MainWindow(QMainWindow):
                 if m == mode:
                     mode_group.actions()[i].setChecked(True)
 
-        backcolor_action = QAction(
-            QIcon(str(ASSETS_DIR / "border-color.png")), "Background Color", self
-        )
-        backcolor_action.setStatusTip("Change Background Color")
-        reader_menu.addAction(backcolor_action)
-        scalemode_action = QAction(
-            QIcon(str(ASSETS_DIR / "edit-scale.png")), "Scale Mode", self
-        )
-        scalemode_action.setStatusTip("Change Image Scalling")
-        reader_menu.addAction(scalemode_action)
+        background_submenu = reader_menu.addMenu("Background Color")
+        color = self.default_settings["background_color"]
+        colors = ["Automatic", "Black", "White", "Grey"]
+        color_group = QActionGroup(self)
+
+        for c in colors:
+            action = QAction(c, self)
+            action.setCheckable(True)
+            action.triggered.connect(lambda: self.background(c))
+            color_group.addAction(action)
+            background_submenu.addAction(action)
+
+        if color_group.actions():
+            for i, c in enumerate(colors):
+                if c == color:
+                    color_group.actions()[i].setChecked(True)
+
+        scalemode_submenu = reader_menu.addMenu("Scale Mode")
+        scale = self.default_settings["scale_type"]
+        scales = ["Fit Screen", "Fit Width", "Fit Height", "Stretch", "Automatic"]
+        scale_group = QActionGroup(self)
+
+        for s in scales:
+            action = QAction(s, self)
+            action.setCheckable(True)
+            # action.triggered.connect(lambda: self.background(c))
+            scale_group.addAction(action)
+            scalemode_submenu.addAction(action)
+
+        if scale_group.actions():
+            for i, s in enumerate(scales):
+                if s == scale:
+                    scale_group.actions()[i].setChecked(True)
+
+        layout_submenu = reader_menu.addMenu("Page Layout")
+        layout = self.default_settings["page_layout"]
+        layouts = ["Single Page", "Double Page", "Automatic"]
+        layout_group = QActionGroup(self)
+
+        for l in layouts:
+            action = QAction(l, self)
+            action.setCheckable(True)
+            # action.triggered.connect(lambda: self.background(c))
+            layout_group.addAction(action)
+            layout_submenu.addAction(action)
+
+        if layout_group.actions():
+            for i, l in enumerate(layouts):
+                if l == layout:
+                    layout_group.actions()[i].setChecked(True)
 
     def _build_playback_menu(self, menu_bar: QMenuBar):
-        reader_menu = menu_bar.addMenu("&Playback")
-        playlist_action = QAction(
-            QIcon(str(ASSETS_DIR / "folder-open-document-music-playlist.png")),
-            "&Playlist",
-            self,
-        )
-        reader_menu.addAction(playlist_action)
+        playback_menu = menu_bar.addMenu("&Playback")
+
+        playlist_submenu = playback_menu.addMenu("Open Recent Manga")
+        playlist = self.file_paths
+
+        for p in playlist:
+            action = QAction(p, self)
+            action.triggered.connect(lambda _, path=p: self.open(path))
+            playlist_submenu.addAction(action)
         previous_action = QAction(
             QIcon(str(ASSETS_DIR / "book-open-previous.png")), "&Previous", self
         )
         previous_action.triggered.connect(self.previousPage)
-        reader_menu.addAction(previous_action)
+        playback_menu.addAction(previous_action)
         next_action = QAction(
             QIcon(str(ASSETS_DIR / "book-open-next.png")), "&Next", self
         )
         next_action.triggered.connect(self.nextPage)
-        reader_menu.addAction(next_action)
+        playback_menu.addAction(next_action)
 
         pChapter_action = QAction(
             QIcon(str(ASSETS_DIR / "document-page-previous.png")),
@@ -222,12 +252,12 @@ class MainWindow(QMainWindow):
             self,
         )
         pChapter_action.triggered.connect(self.previousChapter)
-        reader_menu.addAction(pChapter_action)
+        playback_menu.addAction(pChapter_action)
         nChapter_action = QAction(
             QIcon(str(ASSETS_DIR / "document-page-next.png")), "&Next Chapter", self
         )
         nChapter_action.triggered.connect(self.nextChapter)
-        reader_menu.addAction(nChapter_action)
+        playback_menu.addAction(nChapter_action)
 
     def _build_help_menu(self, menu_bar: QMenuBar):
         help_menu = menu_bar.addMenu("&Help")
@@ -265,44 +295,45 @@ class MainWindow(QMainWindow):
                 pix_map.loadFromData(f.read())
                 self.detect_page_type(pix_map.width(), pix_map.height())
 
-            if self.double:
-                match self.default_settings["reading_mode"]:
-                    case "LTR" | "RTL":
+            match self.default_settings["reading_mode"]:
+                case "LTR" | "RTL":
+                    if self.double:
                         if self.default_settings["swapped_page"]:
                             self.view_stack.setCurrentIndex(0)
-
-                            with cbz.open(pages[self.page_number - 1]) as f:
-                                self.right_pixmap = QPixmap()
-                                self.right_pixmap.loadFromData(f.read())
-
-                            if self.page_number < self.total_pages:
-                                with cbz.open(pages[self.page_number]) as f:
-                                    self.left_pixmap = QPixmap()
-                                    self.left_pixmap.loadFromData(f.read())
-                            else:
-                                self.left_pixmap = None
+                            self.right_pixmap = self.load_pixmap(
+                                cbz, pages, self.page_number - 1
+                            )
+                            self.left_pixmap = self.load_pixmap(
+                                cbz, pages, self.page_number
+                            )
                         else:
                             self.view_stack.setCurrentIndex(0)
+                            self.left_pixmap = self.load_pixmap(
+                                cbz, pages, self.page_number - 1
+                            )
+                            self.right_pixmap = self.load_pixmap(
+                                cbz, pages, self.page_number
+                            )
+                    else:
+                        self.view_stack.setCurrentIndex(1)
+                        self.left_pixmap = self.load_pixmap(
+                            cbz, pages, self.page_number - 1
+                        )
+                        self.right_pixmap = None
 
-                            with cbz.open(pages[self.page_number - 1]) as f:
-                                self.left_pixmap = QPixmap()
-                                self.left_pixmap.loadFromData(f.read())
-
-                            if self.page_number < self.total_pages:
-                                with cbz.open(pages[self.page_number]) as f:
-                                    self.right_pixmap = QPixmap()
-                                    self.right_pixmap.loadFromData(f.read())
-                            else:
-                                self.right_pixmap = None
-            else:
-                self.view_stack.setCurrentIndex(1)
-
-                with cbz.open(pages[self.page_number - 1]) as f:
-                    self.left_pixmap = QPixmap()
-                    self.left_pixmap.loadFromData(f.read())
-                self.right_pixmap = None
-
-            self.imageScale(0)
+                    self.view_stack.adjustSize()
+                    self.imageScale(0)
+                case "Vertical":
+                    self.double = False
+                    self.view_stack.setCurrentIndex(1)
+                    self.left_pixmap = self.load_pixmap(
+                        cbz, pages, self.page_number - 1
+                    )
+                    self.right_pixmap = None
+                    self.view_stack.adjustSize()
+                    self.imageScale(3)
+                case "Vertical Continuous":
+                    pass
 
             loaded_msg = (
                 f"Loaded side-by-side spread"
@@ -310,6 +341,14 @@ class MainWindow(QMainWindow):
                 else f"Loaded single page: {pages[self.page_number - 1]}"
             )
             self.statusBar().showMessage(loaded_msg, 3000)
+
+    def load_pixmap(self, cbz, pages, index) -> QPixmap | None:
+        if 0 <= index < len(pages):
+            with cbz.open(pages[index]) as f:
+                pixmap = QPixmap()
+                pixmap.loadFromData(f.read())
+                return pixmap
+        return None
 
     def imageScale(self, count):
         self.current_scale_mode = count
@@ -346,24 +385,29 @@ class MainWindow(QMainWindow):
                 label.setPixmap(scaled)
             case 1:
                 label.setScaledContents(False)
-                target_size = self.centralWidget().size()
-                if self.double:
-                    target_size.setWidth(int(target_size.width() / 2))
+                target_height = self.centralWidget().height()
 
-                scaled = pixmap.scaled(
-                    target_size,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
+                scaled = pixmap.scaledToHeight(
+                    target_height, Qt.TransformationMode.SmoothTransformation
                 )
                 label.setPixmap(scaled)
-            case 2 | 3:
+            case 2:
                 label.setScaledContents(False)
+                target_width = self.centralWidget().width()
+
+                scaled = pixmap.scaledToWidth(
+                    target_width, Qt.TransformationMode.SmoothTransformation
+                )
+                label.setPixmap(scaled)
+            case 3:
+                label.setScaledContents(True)
                 label.setPixmap(pixmap)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        if self.file_paths[self.file_count]:
-            self.imageScale(self.current_scale_mode)
+        if self.file_paths and self.file_count < len(self.file_paths):
+            if self.file_paths[self.file_count]:
+                self.imageScale(self.current_scale_mode)
 
     def detect_page_type(self, width, height):
         aspect_ratio = width / height
@@ -411,7 +455,7 @@ class MainWindow(QMainWindow):
             self.file_count += 1
             self.page_number = 1
             self.previousStep = 0
-            self.file_path = self.file_paths[self.file_path]
+            self.file_path = data[self.file_count]
             self.default_recents = json_parsing.save_recent(
                 self.default_recents, data[self.file_count]
             )
@@ -423,7 +467,7 @@ class MainWindow(QMainWindow):
             self.file_count -= 1
             self.page_number = 1
             self.previousStep = 0
-            self.file_path = self.file_paths[self.file_path]
+            self.file_path = data[self.file_count]
             self.default_recents = json_parsing.save_recent(
                 self.default_recents, data[self.file_count]
             )
@@ -499,6 +543,27 @@ class MainWindow(QMainWindow):
             self.localFullscreen = False
 
         self.fullscreen_action.setChecked(self.localFullscreen)
+
+    def background(self, backgroundColor):
+        theme = self.default_settings["theme"]
+        match backgroundColor:
+            case "Automatic":
+                match theme:
+                    case "Default":
+                        self.setStyleSheet("QMainWindow { background-color: grey; }")
+                    case "Light":
+                        self.setStyleSheet("QMainWindow { background-color: white; }")
+                    case "Dark":
+                        self.setStyleSheet("QMainWindow { background-color: black; }")
+            case "Black":
+                self.setStyleSheet("QMainWindow { background-color: black; }")
+            case "Grey":
+                self.setStyleSheet("QMainWindow { background-color: grey; }")
+            case "White":
+                self.setStyleSheet("QMainWindow { background-color: white; }")
+
+        self.style().unpolish(self)
+        self.style().polish(self)
 
     def receive_data(self, data):
         self.file_paths = data
