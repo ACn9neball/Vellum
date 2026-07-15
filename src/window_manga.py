@@ -4,17 +4,15 @@ from PyQt6.QtGui import QAction, QActionGroup, QIcon, QKeyEvent, QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QFileDialog,
-    QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
     QMenuBar,
-    QScrollArea,
-    QVBoxLayout,
     QWidget,
     QStackedWidget,
 )
 from widgets import ClickableLabel
+from natsort import natsorted
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 ASSETS_DIR = BASE_DIR / "assets"
@@ -39,6 +37,7 @@ class MainWindow(QMainWindow):
         self.total_pages = 0
         self.previousStep = 0
         self.file_paths = []
+        self.file_path = None
         self.file_count = 0
         self.double = True
 
@@ -97,57 +96,54 @@ class MainWindow(QMainWindow):
         self.menu_bar = QMenuBar(self)
         self.setMenuBar(self.menu_bar)
 
-        self._build_file_menu(self.menu_bar)
-        self._build_reader_menu(self.menu_bar)
-        self._build_playback_menu(self.menu_bar)
-        self._build_help_menu(self.menu_bar)
+        self.file_menu = self.menu_bar.addMenu("&File")
+        self.reader_menu = self.menu_bar.addMenu("&Reader")
+        self.playback_menu = self.menu_bar.addMenu("&Playback")
+        self.help_menu = self.menu_bar.addMenu("&Help")
 
-    def _build_file_menu(self, menu_bar: QMenuBar):
-        file_menu = menu_bar.addMenu("&File")
+        self._build_file_menu()
+        self._build_reader_menu()
+        self._build_playback_menu()
+        self._build_help_menu()
 
+    def _build_file_menu(self):
         open_action = QAction(QIcon(str(ASSETS_DIR / "document.png")), "&Open", self)
         open_action.setStatusTip("Open Manga")
         open_action.triggered.connect(self.openFile)
-        file_menu.addAction(open_action)
+        self.file_menu.addAction(open_action)
 
         multiple_action = QAction(
             QIcon(str(ASSETS_DIR / "documents.png")), "&Open Multiple", self
         )
         multiple_action.setStatusTip("Open Multiple Files")
         multiple_action.triggered.connect(self.openFiles)
-        file_menu.addAction(multiple_action)
+        self.file_menu.addAction(multiple_action)
 
         collection_action = QAction(
             QIcon(str(ASSETS_DIR / "folder-open.png")), "Open Collection", self
         )
         collection_action.setStatusTip("Open Manga Collection")
         collection_action.triggered.connect(self.openFolder)
-        file_menu.addAction(collection_action)
+        self.file_menu.addAction(collection_action)
 
-        file_submenu = file_menu.addMenu("Open Recent Manga")
-        recents = self.default_recents["recent_files"]
+        self.file_submenu = self.file_menu.addMenu("Open Recent Manga")
+        self.update_recents()
 
-        for recent in recents:
-            action = QAction(recent, self)
-            action.triggered.connect(lambda _, path=recent: self.open(path))
-            file_submenu.addAction(action)
-
-        file_menu.addSeparator()
+        self.file_menu.addSeparator()
 
         close_action = QAction(QIcon(str(ASSETS_DIR / "cross.png")), "&Close", self)
         close_action.setStatusTip("Close File")
         close_action.triggered.connect(self.go_back_requested.emit)
-        file_menu.addAction(close_action)
+        self.file_menu.addAction(close_action)
 
         quit_action = QAction(
             QIcon(str(ASSETS_DIR / "door-open-out.png")), "&Quit", self
         )
         quit_action.setStatusTip("Quit Application")
         quit_action.triggered.connect(self.close)
-        file_menu.addAction(quit_action)
+        self.file_menu.addAction(quit_action)
 
-    def _build_reader_menu(self, menu_bar: QMenuBar):
-        reader_menu = menu_bar.addMenu("&Reader")
+    def _build_reader_menu(self):
         self.fullscreen_action = QAction("&Fullscreen", self)
         self.fullscreen_action.setStatusTip("Fullscreen Mode")
         self.fullscreen_action.setCheckable(True)
@@ -155,9 +151,9 @@ class MainWindow(QMainWindow):
         self.fullscreen_action.triggered.connect(
             lambda _, c=self.localFullscreen: self.fullscreen(c)
         )
-        reader_menu.addAction(self.fullscreen_action)
+        self.reader_menu.addAction(self.fullscreen_action)
 
-        readmode_submenu = reader_menu.addMenu("Reading Mode")
+        readmode_submenu = self.reader_menu.addMenu("Reading Mode")
         mode = self.default_settings["reading_mode"]
         modes = ["LTR", "RTL", "Vertical", "Vertical Continuous"]
         mode_group = QActionGroup(self)
@@ -174,7 +170,7 @@ class MainWindow(QMainWindow):
                 if m == mode:
                     mode_group.actions()[i].setChecked(True)
 
-        background_submenu = reader_menu.addMenu("Background Color")
+        background_submenu = self.reader_menu.addMenu("Background Color")
         color = self.default_settings["background_color"]
         colors = ["Automatic", "Black", "White", "Grey"]
         color_group = QActionGroup(self)
@@ -191,7 +187,7 @@ class MainWindow(QMainWindow):
                 if c == color:
                     color_group.actions()[i].setChecked(True)
 
-        scalemode_submenu = reader_menu.addMenu("Scale Mode")
+        scalemode_submenu = self.reader_menu.addMenu("Scale Mode")
         scale = self.default_settings["scale_type"]
         scales = ["Fit Screen", "Fit Width", "Fit Height", "Stretch", "Automatic"]
         scale_group = QActionGroup(self)
@@ -208,7 +204,7 @@ class MainWindow(QMainWindow):
                 if s == scale:
                     scale_group.actions()[i].setChecked(True)
 
-        layout_submenu = reader_menu.addMenu("Page Layout")
+        layout_submenu = self.reader_menu.addMenu("Page Layout")
         layout = self.default_settings["page_layout"]
         layouts = ["Single Page", "Double Page", "Automatic"]
         layout_group = QActionGroup(self)
@@ -225,26 +221,20 @@ class MainWindow(QMainWindow):
                 if l == layout:
                     layout_group.actions()[i].setChecked(True)
 
-    def _build_playback_menu(self, menu_bar: QMenuBar):
-        playback_menu = menu_bar.addMenu("&Playback")
+    def _build_playback_menu(self):
+        self.playlist_submenu = self.playback_menu.addMenu("Open Playlist")
+        self.update_playlist()
 
-        playlist_submenu = playback_menu.addMenu("Open Recent Manga")
-        playlist = self.file_paths
-
-        for p in playlist:
-            action = QAction(p, self)
-            action.triggered.connect(lambda _, path=p: self.open(path))
-            playlist_submenu.addAction(action)
         previous_action = QAction(
             QIcon(str(ASSETS_DIR / "book-open-previous.png")), "&Previous", self
         )
         previous_action.triggered.connect(self.previousPage)
-        playback_menu.addAction(previous_action)
+        self.playback_menu.addAction(previous_action)
         next_action = QAction(
             QIcon(str(ASSETS_DIR / "book-open-next.png")), "&Next", self
         )
         next_action.triggered.connect(self.nextPage)
-        playback_menu.addAction(next_action)
+        self.playback_menu.addAction(next_action)
 
         pChapter_action = QAction(
             QIcon(str(ASSETS_DIR / "document-page-previous.png")),
@@ -252,24 +242,53 @@ class MainWindow(QMainWindow):
             self,
         )
         pChapter_action.triggered.connect(self.previousChapter)
-        playback_menu.addAction(pChapter_action)
+        self.playback_menu.addAction(pChapter_action)
         nChapter_action = QAction(
             QIcon(str(ASSETS_DIR / "document-page-next.png")), "&Next Chapter", self
         )
         nChapter_action.triggered.connect(self.nextChapter)
-        playback_menu.addAction(nChapter_action)
+        self.playback_menu.addAction(nChapter_action)
 
-    def _build_help_menu(self, menu_bar: QMenuBar):
-        help_menu = menu_bar.addMenu("&Help")
+    def _build_help_menu(self):
         help_action = QAction(QIcon(str(ASSETS_DIR / "question.png")), "Help", self)
-        help_menu.addAction(help_action)
+        self.help_menu.addAction(help_action)
         about_action = QAction(
             QIcon(str(ASSETS_DIR / "information.png")), "About", self
         )
-        help_menu.addAction(about_action)
+        self.help_menu.addAction(about_action)
+
+    def update_playlist(self):
+        self.playlist_submenu.clear()
+        playlist = self.file_paths
+        playlist_group = QActionGroup(self)
+
+        for p in playlist:
+            action = QAction(p, self)
+            action.setCheckable(True)
+            action.triggered.connect(lambda _, path=p: self.open(path))
+            playlist_group.addAction(action)
+            self.playlist_submenu.addAction(action)
+
+        if playlist_group.actions():
+            for i, p in enumerate(playlist):
+                if p == self.file_path:
+                    playlist_group.actions()[i].setChecked(True)
+
+    def update_recents(self):
+        self.file_submenu.clear()
+        recents = self.default_recents["recent_files"]
+
+        for recent in recents:
+            action = QAction(recent, self)
+            action.triggered.connect(lambda _, path=recent: self.open(path))
+            self.file_submenu.addAction(action)
+
+    def updates(self):
+        self.update_playlist()
+        self.update_recents()
 
     def display(self, path):
-        fullScreen = self.default_settings["fullscreen"]
+        fullScreen = self.localFullscreen
         self.fullscreen(fullScreen)
         if not path or not Path(path).exists():
             return
@@ -341,6 +360,7 @@ class MainWindow(QMainWindow):
                 else f"Loaded single page: {pages[self.page_number - 1]}"
             )
             self.statusBar().showMessage(loaded_msg, 3000)
+            self.updates()
 
     def load_pixmap(self, cbz, pages, index) -> QPixmap | None:
         if 0 <= index < len(pages):
@@ -477,14 +497,16 @@ class MainWindow(QMainWindow):
         self.file_path = file_path
         self.file_paths = [self.file_path]
         if self.file_path != "":
+            self.page_number = 1
+            self.total_pages = 0
+            self.file_count = 0
             self.default_recents = json_parsing.save_recent(
                 self.default_recents, self.file_paths[0]
             )
             self.display(self.file_path)
+            self.updates()
 
     def openFile(self):
-        self.page_number = 1
-        self.total_pages = 0
         self.file_path, _ = QFileDialog.getOpenFileName(
             None,
             "Select File",
@@ -492,11 +514,16 @@ class MainWindow(QMainWindow):
             "Comic Book Zip (*.cbz)",
         )
         file_paths = [self.file_path]
+        self.file_paths = natsorted(file_paths)
         if self.file_path != "":
+            self.page_number = 1
+            self.total_pages = 0
+            self.file_count = 0
             self.default_recents = json_parsing.save_recent(
                 self.default_recents, file_paths[0]
             )
             self.display(self.file_path)
+            self.updates()
 
     def openFiles(self):
         file_paths, _ = QFileDialog.getOpenFileNames(
@@ -507,11 +534,16 @@ class MainWindow(QMainWindow):
         )
 
         if file_paths != []:
+            self.page_number = 1
+            self.total_pages = 0
+            self.file_count = 0
             self.default_recents = json_parsing.save_recent(
                 self.default_recents, file_paths[0]
             )
             self.file_path = file_paths[0]
+            self.file_paths = natsorted(file_paths)
             self.display(self.file_path)
+            self.updates()
 
     def openFolder(self):
         folder_path = QFileDialog.getExistingDirectory(
@@ -519,18 +551,21 @@ class MainWindow(QMainWindow):
             "Select File",
             self.default_settings["folder_path"],
         )
-
         if not folder_path:
             return
-
         folder_path = Path(folder_path)
         file_paths = [str(file) for file in folder_path.glob("*.cbz")]
         if file_paths != []:
+            self.page_number = 1
+            self.total_pages = 0
+            self.file_count = 0
             self.default_recents = json_parsing.save_recent(
                 self.default_recents, file_paths[0]
             )
             self.file_path = file_paths[0]
+            self.file_paths = natsorted(file_paths)
             self.display(self.file_path)
+            self.updates()
 
     def fullscreen(self, f: bool):
         if f:
@@ -566,7 +601,8 @@ class MainWindow(QMainWindow):
         self.style().polish(self)
 
     def receive_data(self, data):
-        self.file_paths = data
+        self.file_paths = natsorted(data)
+        self.file_path = self.file_paths[0]
         self.page_number = 1
         self.file_count = 0
         self.display(data[self.file_count])
