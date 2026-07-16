@@ -8,10 +8,12 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMenuBar,
+    QScrollArea,
+    QVBoxLayout,
     QWidget,
     QStackedWidget,
 )
-from widgets import ClickableLabel
+from custom_widgets import ClickableLabel
 from natsort import natsorted
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -29,6 +31,8 @@ class MainWindow(QMainWindow):
         self.default_recents = json_parsing.load_recents()
 
         self.localFullscreen = self.default_settings["fullscreen"]
+        self.localReading = self.default_settings["reading_mode"]
+        self.localSwapped = self.default_settings["swapped_page"]
         backgroundColor = self.default_settings["background_color"]
         self.background(backgroundColor)
 
@@ -51,6 +55,7 @@ class MainWindow(QMainWindow):
 
         self._init_double_widget()
         self._init_single_widget()
+        self._init_scrollable_widget()
 
     def _init_double_widget(self):
         container = QWidget()
@@ -91,6 +96,39 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.center_image)
 
         self.view_stack.addWidget(container)
+
+    def _init_scrollable_widget(self):
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.scroll_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+
+        self.scroll_container = QWidget()
+        self.scroll_layout = QVBoxLayout(self.scroll_container)
+        self.scroll_layout.setContentsMargins(0, 0, 0, 0)
+        self.scroll_layout.setSpacing(0)
+
+        self.scroll_area.setWidget(self.scroll_container)
+        self.view_stack.addWidget(self.scroll_area)
+
+    def _populate_scrollable_widget(self, cbz, pages):
+        while self.scroll_layout.count():
+            item = self.scroll_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+        for i, _ in enumerate(pages):
+            page_label = QLabel()
+            page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            pixmap = self.load_pixmap(cbz, pages, i)
+            if pixmap:
+                page_label.setPixmap(pixmap)
+            self.scroll_layout.addWidget(page_label)
 
     def _init_menu_bar(self):
         self.menu_bar = QMenuBar(self)
@@ -145,7 +183,6 @@ class MainWindow(QMainWindow):
 
     def _build_reader_menu(self):
         self.fullscreen_action = QAction("&Fullscreen", self)
-        self.fullscreen_action.setStatusTip("Fullscreen Mode")
         self.fullscreen_action.setCheckable(True)
         self.fullscreen_action.setChecked(self.localFullscreen)
         self.fullscreen_action.triggered.connect(
@@ -161,7 +198,7 @@ class MainWindow(QMainWindow):
         for m in modes:
             action = QAction(m, self)
             action.setCheckable(True)
-            # action.triggered.connect(lambda _, path=m: self.open(path))
+            action.triggered.connect(lambda: self.reading(m))
             mode_group.addAction(action)
             readmode_submenu.addAction(action)
 
@@ -220,6 +257,14 @@ class MainWindow(QMainWindow):
             for i, l in enumerate(layouts):
                 if l == layout:
                     layout_group.actions()[i].setChecked(True)
+
+        self.swapped_action = QAction("&Swap Panels", self)
+        self.swapped_action.setCheckable(True)
+        self.swapped_action.setChecked(self.localSwapped)
+        self.swapped_action.triggered.connect(
+            lambda _, c=self.localSwapped: self.swapped(c)
+        )
+        self.reader_menu.addAction(self.swapped_action)
 
     def _build_playback_menu(self):
         self.playlist_submenu = self.playback_menu.addMenu("Open Playlist")
@@ -317,7 +362,7 @@ class MainWindow(QMainWindow):
             match self.default_settings["reading_mode"]:
                 case "LTR" | "RTL":
                     if self.double:
-                        if self.default_settings["swapped_page"]:
+                        if self.localSwapped:
                             self.view_stack.setCurrentIndex(0)
                             self.right_pixmap = self.load_pixmap(
                                 cbz, pages, self.page_number - 1
@@ -352,14 +397,9 @@ class MainWindow(QMainWindow):
                     self.view_stack.adjustSize()
                     self.imageScale(3)
                 case "Vertical Continuous":
-                    pass
+                    self.view_stack.setCurrentIndex(2)
+                    self._populate_scrollable_widget(cbz, pages)
 
-            loaded_msg = (
-                f"Loaded side-by-side spread"
-                if self.right_pixmap
-                else f"Loaded single page: {pages[self.page_number - 1]}"
-            )
-            self.statusBar().showMessage(loaded_msg, 3000)
             self.updates()
 
     def load_pixmap(self, cbz, pages, index) -> QPixmap | None:
@@ -437,21 +477,55 @@ class MainWindow(QMainWindow):
             self.double = True
 
     def keyPressEvent(self, event: QKeyEvent):
-        match event.key():
-            case Qt.Key.Key_Right:
-                self.nextPage()
-            case Qt.Key.Key_N:
-                self.nextPage()
-            case Qt.Key.Key_Left:
-                self.previousPage()
-            case Qt.Key.Key_P:
-                self.previousPage()
-            case Qt.Key.Key_Escape:
-                if self.localFullscreen:
-                    self.localFullscreen = False
-                    self.fullscreen(False)
-            case _:
-                super().keyPressEvent(event)
+        match self.localReading:
+            case "LTR":
+                match event.key():
+                    case Qt.Key.Key_Right:
+                        self.nextPage()
+                    case Qt.Key.Key_N:
+                        self.nextChapter()
+                    case Qt.Key.Key_Left:
+                        self.previousPage()
+                    case Qt.Key.Key_P:
+                        self.previousChapter()
+                    case Qt.Key.Key_Escape:
+                        if self.localFullscreen:
+                            self.localFullscreen = False
+                        self.fullscreen(False)
+                    case _:
+                        super().keyPressEvent(event)
+            case "RTL":
+                match event.key():
+                    case Qt.Key.Key_Right:
+                        self.previousPage()
+                    case Qt.Key.Key_N:
+                        self.nextChapter()
+                    case Qt.Key.Key_Left:
+                        self.nextPage()
+                    case Qt.Key.Key_P:
+                        self.previousChapter()
+                    case Qt.Key.Key_Escape:
+                        if self.localFullscreen:
+                            self.localFullscreen = False
+                        self.fullscreen(False)
+                    case _:
+                        super().keyPressEvent(event)
+            case "Vertical":
+                match event.key():
+                    case Qt.Key.Key_Down:
+                        self.nextPage()
+                    case Qt.Key.Key_N:
+                        self.nextChapter()
+                    case Qt.Key.Key_Up:
+                        self.previousPage()
+                    case Qt.Key.Key_P:
+                        self.previousChapter()
+                    case Qt.Key.Key_Escape:
+                        if self.localFullscreen:
+                            self.localFullscreen = False
+                        self.fullscreen(False)
+                    case _:
+                        super().keyPressEvent(event)
 
     def nextPage(self):
         step = 2 if self.double else 1
@@ -599,6 +673,12 @@ class MainWindow(QMainWindow):
 
         self.style().unpolish(self)
         self.style().polish(self)
+
+    def reading(self, reading_mode):
+        self.localReading = reading_mode
+
+    def swapped(self, s: bool):
+        self.localSwapped = s
 
     def receive_data(self, data):
         self.file_paths = natsorted(data)
