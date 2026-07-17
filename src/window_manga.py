@@ -26,7 +26,6 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.statusBar()
         self.default_settings = json_parsing.load_settings()
         self.default_recents = json_parsing.load_recents()
 
@@ -89,7 +88,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        self.center_image = QLabel()
+        self.center_image = ClickableLabel()
         self.center_image.setAlignment(
             Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter
         )
@@ -123,7 +122,7 @@ class MainWindow(QMainWindow):
                 widget.deleteLater()
 
         for i, _ in enumerate(pages):
-            page_label = QLabel()
+            page_label = ClickableLabel()
             page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             pixmap = self.load_pixmap(cbz, pages, i)
             if pixmap:
@@ -198,7 +197,7 @@ class MainWindow(QMainWindow):
         for m in modes:
             action = QAction(m, self)
             action.setCheckable(True)
-            action.triggered.connect(lambda: self.reading(m))
+            action.triggered.connect(lambda _, mode=m: self.reading(mode))
             mode_group.addAction(action)
             readmode_submenu.addAction(action)
 
@@ -359,7 +358,7 @@ class MainWindow(QMainWindow):
                 pix_map.loadFromData(f.read())
                 self.detect_page_type(pix_map.width(), pix_map.height())
 
-            match self.default_settings["reading_mode"]:
+            match self.localReading:
                 case "LTR" | "RTL":
                     if self.double:
                         if self.localSwapped:
@@ -526,6 +525,18 @@ class MainWindow(QMainWindow):
                         self.fullscreen(False)
                     case _:
                         super().keyPressEvent(event)
+            case "Vertical Continuous":
+                match event.key():
+                    case Qt.Key.Key_N:
+                        self.nextChapter()
+                    case Qt.Key.Key_P:
+                        self.previousChapter()
+                    case Qt.Key.Key_Escape:
+                        if self.localFullscreen:
+                            self.localFullscreen = False
+                        self.fullscreen(False)
+                    case _:
+                        super().keyPressEvent(event)
 
     def nextPage(self):
         step = 2 if self.double else 1
@@ -676,6 +687,14 @@ class MainWindow(QMainWindow):
 
     def reading(self, reading_mode):
         self.localReading = reading_mode
+
+        if reading_mode in ["Vertical", "Vertical Continuous"]:
+            self.double = False
+
+        if self.file_path != None:
+            if reading_mode in ["LTR", "RTL"] and self.page_number % 2 == 0:
+                self.page_number = max(1, self.page_number - 1)
+            self.display(self.file_paths[self.file_count])
 
     def swapped(self, s: bool):
         self.localSwapped = s
