@@ -1,7 +1,6 @@
 import sys
 from PyQt6.QtWidgets import QApplication
-import window_home
-import window_manga
+import window_home, window_manga
 
 
 class AppController:

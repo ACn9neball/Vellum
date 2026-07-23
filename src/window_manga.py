@@ -133,10 +133,10 @@ class MainWindow(QMainWindow):
         self.menu_bar = QMenuBar(self)
         self.setMenuBar(self.menu_bar)
 
-        self.file_menu = self.menu_bar.addMenu("&File")
-        self.reader_menu = self.menu_bar.addMenu("&Reader")
-        self.playback_menu = self.menu_bar.addMenu("&Playback")
-        self.help_menu = self.menu_bar.addMenu("&Help")
+        self.file_menu = self.menu_bar.addMenu("File")
+        self.reader_menu = self.menu_bar.addMenu("Reader")
+        self.playback_menu = self.menu_bar.addMenu("Playback")
+        self.help_menu = self.menu_bar.addMenu("Help")
 
         self._build_file_menu()
         self._build_reader_menu()
@@ -181,7 +181,7 @@ class MainWindow(QMainWindow):
         self.file_menu.addAction(quit_action)
 
     def _build_reader_menu(self):
-        self.fullscreen_action = QAction("&Fullscreen", self)
+        self.fullscreen_action = QAction("Fullscreen", self)
         self.fullscreen_action.setCheckable(True)
         self.fullscreen_action.setChecked(self.localFullscreen)
         self.fullscreen_action.triggered.connect(
@@ -488,9 +488,10 @@ class MainWindow(QMainWindow):
                     case Qt.Key.Key_P:
                         self.previousChapter()
                     case Qt.Key.Key_Escape:
-                        if self.localFullscreen:
-                            self.localFullscreen = False
-                        self.fullscreen(False)
+                        self.go_back_requested.emit
+                    case Qt.Key.Key_F:
+                        self.localFullscreen = not self.localFullscreen
+                        self.fullscreen(self.localFullscreen)
                     case _:
                         super().keyPressEvent(event)
             case "RTL":
@@ -504,9 +505,10 @@ class MainWindow(QMainWindow):
                     case Qt.Key.Key_P:
                         self.previousChapter()
                     case Qt.Key.Key_Escape:
-                        if self.localFullscreen:
-                            self.localFullscreen = False
-                        self.fullscreen(False)
+                        self.go_back_requested.emit
+                    case Qt.Key.Key_F:
+                        self.localFullscreen = not self.localFullscreen
+                        self.fullscreen(self.localFullscreen)
                     case _:
                         super().keyPressEvent(event)
             case "Vertical":
@@ -520,9 +522,10 @@ class MainWindow(QMainWindow):
                     case Qt.Key.Key_P:
                         self.previousChapter()
                     case Qt.Key.Key_Escape:
-                        if self.localFullscreen:
-                            self.localFullscreen = False
-                        self.fullscreen(False)
+                        self.go_back_requested.emit
+                    case Qt.Key.Key_F:
+                        self.localFullscreen = not self.localFullscreen
+                        self.fullscreen(self.localFullscreen)
                     case _:
                         super().keyPressEvent(event)
             case "Vertical Continuous":
@@ -532,9 +535,10 @@ class MainWindow(QMainWindow):
                     case Qt.Key.Key_P:
                         self.previousChapter()
                     case Qt.Key.Key_Escape:
-                        if self.localFullscreen:
-                            self.localFullscreen = False
-                        self.fullscreen(False)
+                        self.go_back_requested.emit
+                    case Qt.Key.Key_F:
+                        self.localFullscreen = not self.localFullscreen
+                        self.fullscreen(self.localFullscreen)
                     case _:
                         super().keyPressEvent(event)
 
@@ -551,7 +555,7 @@ class MainWindow(QMainWindow):
         if self.page_number - self.previousStep >= 1:
             self.page_number -= self.previousStep
             self.display(self.file_paths[self.file_count])
-        elif self.page_number - self.previousStep < 1:
+        elif self.page_number < 1:
             self.previousChapter()
 
     def nextChapter(self):
@@ -682,7 +686,7 @@ class MainWindow(QMainWindow):
             case "White":
                 self.setStyleSheet("QMainWindow { background-color: white; }")
 
-        self.style().unpolish(self)
+        self.style().polish(self)
         self.style().polish(self)
 
     def reading(self, reading_mode):

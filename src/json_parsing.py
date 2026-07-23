@@ -12,7 +12,7 @@ recents_file = config_dir / "recents.json"
 
 def load_settings():
     default_settings = {
-        "theme": "Light",
+        "theme": "Default",
         "folder_path": "/home/",
         "background_color": "Automatic",
         "reading_mode": "LTR",
@@ -37,6 +37,11 @@ def save_settings(data):
         json.dump(data, f, indent=4)
 
 
+def reset_settings():
+    settings_file.unlink(missing_ok=True)
+    load_settings()
+
+
 def load_recents():
     default_recents = {"recent_files": [], "recent_file_pages": []}
     if not recents_file.exists():
@@ -54,6 +59,11 @@ def save_recents(data):
         json.dump(data, f, indent=4)
 
 
+def reset_recents():
+    recents_file.unlink(missing_ok=True)
+    load_recents()
+
+
 def save_recent(data, path):
     recents = data["recent_files"]
     found = False
@@ -68,7 +78,7 @@ def save_recent(data, path):
         recents.pop(index)
         recents.append(path)
     else:
-        if len(recents) < 30:
+        if len(recents) < 55:
             recents.append(path)
         else:
             recents.pop(0)

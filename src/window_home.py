@@ -1,3 +1,4 @@
+import os, sys
 from pathlib import Path
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QIcon
@@ -261,6 +262,9 @@ class MainWindow(QMainWindow):
         swapped_layout.addStretch()
         swapped_layout.addWidget(self.chxSwapped)
 
+        btnClear = QPushButton("Clear")
+        btnClear.clicked.connect(self.clearSettingToggled)
+
         space_container = QWidget()
         space_container.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
@@ -281,6 +285,7 @@ class MainWindow(QMainWindow):
         self.right_layout.addWidget(page_container)
         self.right_layout.addWidget(scale_container)
         self.right_layout.addWidget(swapped_container)
+        self.right_layout.addWidget(btnClear)
         self.right_layout.addWidget(space_container)
 
     def recents(self):
@@ -289,18 +294,18 @@ class MainWindow(QMainWindow):
         dividerOne.setFrameShape(QFrame.Shape.HLine)
         dividerOne.setFrameShadow(QFrame.Shadow.Sunken)
 
-        lwdRecents = QListWidget()
+        self.lwdRecents = QListWidget()
         recents = self.default_recents["recent_files"]
         recents.reverse()
-        lwdRecents.addItems(recents)
-        lwdRecents.itemDoubleClicked.connect(self.recentItemClicked)
+        self.lwdRecents.addItems(recents)
+        self.lwdRecents.itemDoubleClicked.connect(self.recentItemClicked)
 
         btnClear = QPushButton("Clear")
-        btnClear.clicked.connect(self.clearToggled)
+        btnClear.clicked.connect(self.clearRecentToggled)
 
         self.right_layout.addWidget(lblRecent)
         self.right_layout.addWidget(dividerOne)
-        self.right_layout.addWidget(lwdRecents)
+        self.right_layout.addWidget(self.lwdRecents)
         self.right_layout.addWidget(btnClear)
 
     def pathDefault(self):
@@ -355,7 +360,7 @@ class MainWindow(QMainWindow):
             )
             self.data_submitted.emit(file_paths)
 
-    def clearToggled(self):
+    def clearRecentToggled(self):
         mbxConfirm = QMessageBox()
         mbxConfirm.setWindowTitle("Clear All")
         mbxConfirm.setText("Clear All Recent Entries")
@@ -367,9 +372,34 @@ class MainWindow(QMainWindow):
 
         response = mbxConfirm.exec()
         if response == QMessageBox.StandardButton.Yes:
-            pass
-        elif response == QMessageBox.StandardButton.No:
-            pass
+            json_parsing.reset_recents()
+            self.lwdRecents.clear()
+
+    def clearSettingToggled(self):
+        mbxConfirm = QMessageBox()
+        mbxConfirm.setWindowTitle("Revert to default settings")
+        mbxConfirm.setText("Go back to default settings")
+        mbxConfirm.setIcon(QMessageBox.Icon.Warning)
+        mbxConfirm.setStandardButtons(
+            QMessageBox.StandardButton.No | QMessageBox.StandardButton.Yes
+        )
+        mbxConfirm.setDefaultButton(QMessageBox.StandardButton.No)
+
+        response = mbxConfirm.exec()
+        if response == QMessageBox.StandardButton.Yes:
+            json_parsing.reset_settings()
+            mbxReboot = QMessageBox()
+            mbxReboot.setWindowTitle("Reboot application")
+            mbxReboot.setText("To revert settings reboot is needed. Reboot?")
+            mbxReboot.setIcon(QMessageBox.Icon.Question)
+            mbxReboot.setStandardButtons(
+                QMessageBox.StandardButton.No | QMessageBox.StandardButton.Yes
+            )
+            mbxReboot.setDefaultButton(QMessageBox.StandardButton.No)
+
+            response2 = mbxReboot.exec()
+            if response2 == QMessageBox.StandardButton.Yes:
+                os.execv(sys.executable, [sys.executable] + sys.argv)
 
     def openFile(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -394,6 +424,7 @@ class MainWindow(QMainWindow):
         )
 
         if file_paths != []:
+
             self.default_recents = json_parsing.save_recent(
                 self.default_recents, file_paths[0]
             )
