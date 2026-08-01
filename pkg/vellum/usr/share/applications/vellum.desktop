@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Vellum
+Comment=Custom PyQt Application For Reading Manga
+Exec=vellum
+Icon=vellum
+Terminal=false
+Categories=Utility;
